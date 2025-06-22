@@ -1,36 +1,70 @@
+
 import streamlit as st
 import pandas as pd
-import io
+import base64
+from io import BytesIO
 
-st.set_page_config(page_title="Convertisseur Excel → Bonus CSV", layout="centered")
-st.title("🎁 Convertisseur de fichiers bonus")
-st.write("Charge un fichier Excel au format Squadeasy et récupère le fichier CSV formaté.")
+# Personnalisation CSS
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-color: #FFFFFF;
+    }}
+    .main > div {{
+        padding-top: 2rem;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-uploaded_file = st.file_uploader("Choisis ton fichier Excel", type=[".xlsx"])
+# Affichage du logo
+st.image("resized_logo.png", width=200)
 
-if uploaded_file:
+# Intro personnalisée
+st.markdown("""
+### 🎯 Bienvenue sur l'outil de conversion des fichiers bonus
+
+Dépose ici un fichier Excel, et l'application le convertira automatiquement au format standard attendu.  
+Voici les colonnes que ton fichier doit comporter, dans cet ordre :  
+📧 email, ⭐ points bonus, 📅 date (NN/MM/JJ), 📝 raison du bonus.
+""")
+
+# Bouton pour télécharger le fichier modèle
+with open("modele_bonus.xlsx", "rb") as f:
+    modele_bytes = f.read()
+
+st.download_button(
+    label="📄 Télécharger le fichier modèle",
+    data=modele_bytes,
+    file_name="modele_bonus.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# Uploader le fichier utilisateur
+uploaded_file = st.file_uploader("Dépose ton fichier Excel ici", type=["xlsx"])
+
+if uploaded_file is not None:
     try:
-        excel_data = pd.read_excel(uploaded_file, sheet_name="Utilisateurs")
+        df = pd.read_excel(uploaded_file)
 
-        df_formate = excel_data.rename(columns={
-            "Email": "Email",
-            "Total": "Montant",
-            "Date": "Date",
-            "Raison": "Raison"
-        })[["Email", "Montant", "Date", "Raison"]]
+        # Vérifie qu'on a au moins 4 colonnes
+        if df.shape[1] < 4:
+            st.error("❌ Le fichier doit contenir au moins 4 colonnes.")
+        else:
+            # Garde les 4 premières colonnes et renomme-les
+            df = df.iloc[:, :4]
+            df.columns = ['Email', 'Points bonus', 'Date', 'Raison']
 
-        # Convertir en CSV pour téléchargement
-        csv_buffer = io.StringIO()
-        df_formate.to_csv(csv_buffer, index=False)
-        csv_bytes = csv_buffer.getvalue().encode('utf-8')
-
-        st.success("✅ Conversion réussie !")
-        st.download_button(
-            label="📁 Télécharger le CSV formaté",
-            data=csv_bytes,
-            file_name="bonus_format.csv",
-            mime="text/csv"
-        )
-
+            # Exporter le fichier au format CSV
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.success("✅ Conversion réussie !")
+            st.download_button(
+                label="📥 Télécharger le fichier CSV converti",
+                data=csv,
+                file_name="bonus_converti.csv",
+                mime="text/csv"
+            )
     except Exception as e:
-        st.error(f"❌ Erreur lors du traitement du fichier : {e}")
+        st.error(f"Une erreur est survenue : {e}")
